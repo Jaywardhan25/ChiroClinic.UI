@@ -30657,6 +30657,6 @@ html[dir="rtl"] [direction="rtl"][data-sidebar-style="compact"]:not([data-layout
 /*# sourceMappingURL=style.css.map */
 
 
-a.btn.btn-primary.shadow.btn-xs.sharp.mr-2.add-user-btn {
-  width: 125px !important;
+button.btn.btn-primary.shadow.btn-xs.sharp.mr-2.add-user-btn {
+    width: 125px;
 }

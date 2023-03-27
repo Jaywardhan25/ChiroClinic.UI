@@ -1,121 +1,94 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { Modal } from "react-bootstrap";
-import { nanoid } from "nanoid";
 import swal from "sweetalert";
 import PageTitle from "../layouts/PageTitle";
-import Editable from "./EditableCompanies";
-import { useSelector } from "react-redux";
-import config from "../../config";
-import axios from 'axios';
+import { useDispatch, useSelector } from "react-redux";
+import {
+  addCompany,
+  deleteCompany,
+  fetchCompanies,
+} from "../../store/actions/CompaniesActions";
 
 const Companies = () => {
-  const [CompaniesList, setCompaniesList] = useState([]);
-  const userId = useSelector(state => state.auth.auth.data.UserId);
+  const dispatch = useDispatch();
+  const CompaniesList = useSelector((state) => state.companies.companies);
+  const userId = useSelector((state) => state.auth.auth.data.UserId);
+  const [formData, setFormData] = useState({});
+  const [isEdit, setIsEdit] = useState(false);
 
-  const getCompaniessList = () => {
-    axios({
-      method: "get",
-      url: config.base_url + "/api/Company/GetAllCompany",
-    }).then(function (response) {
-      var CompaniessListResult = response.data;
-      console.log(CompaniessListResult, "test it");
-      setCompaniesList(CompaniessListResult);
-      console.log(CompaniesList, "test Companieslist new");
-    });
-  };
+  // Modal
+  const [addCard, setAddCard] = useState(false);
 
   useEffect(() => {
-    getCompaniessList();
+    dispatch(fetchCompanies());
   }, []);
 
   // delete data
-  const handleDeleteClick = (contentId) => {
-    console.log(contentId, "test dele id");
-    axios({
-      method: "delete",
-      url: config.base_url + `/api/Company/DeleteCompany?id=${contentId}`,
-    }).then(function (response) {
-      console.log(contentId, "has been clicked");
-      var deletEresult = response.data;
-      console.log(deletEresult, "deletEresult test it");
-      const newCompaniesList = [...CompaniesList];
-      const index = CompaniesList.findIndex(
-        (content) => content.id === contentId
-      );
-      newCompaniesList.splice(index, 1);
-      setCompaniesList(newCompaniesList);
-      getCompaniessList();
+  const handleDeleteClick = (id) => {
+    swal({
+      text: "Are you sure you want to delete this company?",
+      buttons: {
+        no: {
+          text: "No",
+          value: false,
+        },
+        yes: {
+          text: "Yes",
+          value: true,
+        },
+      },
+    }).then((res) => {
+      if (res) {
+        dispatch(deleteCompany(id)).then(() => dispatch(fetchCompanies()));
+      }
     });
   };
 
-  //Modal box
-  const [addCard, setAddCard] = useState(false);
-  const [question, setQuestion] = useState(false)
-
-  const [addFormData, setAddFormData] = useState({
-    companyName: "",
-    companyDescription: "",
-    isActive: true,
-    isDeleted: false,
-  });
-
-  // Add contact function
-  const handleAddFormChange = (event) => {
+  const handleInputChange = (event) => {
     event.preventDefault();
-    const { target: { name, value } } = event;
-    const newFormData = { ...addFormData };
+    const {
+      target: { name, value },
+    } = event;
+    const newFormData = Object.assign({}, formData);
     newFormData[name] = value;
-    setAddFormData(newFormData);
+    setFormData(newFormData);
   };
-  
-  //Add Submit data
-  const handleAddFormSubmit = (event) => {
+
+  const handleFormSubmit = (event) => {
     event.preventDefault();
     var error = false;
     var errorMsg = "";
-    if (addFormData.name === "") {
+    if (formData.name === "") {
       error = true;
-      errorMsg = "Please fill  companyName";
+      errorMsg = "Please fill companyName";
     }
     if (!error) {
-
       let data = {
-        "companyId": 0,
-        "companyName": addFormData.companyName,
-        "companyDescription": addFormData.companyDescription,
-        "createdDate": new Date().toISOString(),
-        "createdBy": userId,
-        "modifiedDate": new Date().toISOString(),
-        "modifiedBy": userId
+        companyId: isEdit ? formData.companyId : 0,
+        companyName: formData.companyName,
+        companyDescription: formData.companyDescription,
+        createdDate: new Date().toISOString(),
+        createdBy: userId,
+        modifiedDate: new Date().toISOString(),
+        modifiedBy: userId,
       };
+      console.log({ data });
 
-      var config = {
-        method: 'post',
-        url: config.base_url + '/api/Company/AddCompany',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        data: JSON.stringify(data)
-      };
-
-      axios(config)
+      dispatch(addCompany(data))
         .then(function (response) {
-          data.guid = nanoid();
-          console.log(JSON.stringify(response.data));
-
-          const newcompanyList = [...CompaniesList, data];
-          setCompaniesList(newcompanyList);
+          swal(
+            "Good job!",
+            `Successfully ${isEdit ? "Updated" : "Added"}`,
+            "success"
+          );
           setAddCard(false);
-          swal("Good job!", "Successfully Added", "success");
 
-          setAddFormData({
+          setFormData({
             companyName: "",
             companyDescription: "",
             isActive: true,
             isDeleted: false,
-          })
-          getCompaniessList();
+          });
         })
         .catch(function (error) {
           console.log(error);
@@ -125,133 +98,34 @@ const Companies = () => {
     }
   };
 
-  // Active data
-  // const chageData = (frist, sec) => {
-  //   for (var i = 0; i < data.length; ++i) {
-  //     if (i >= frist && i < sec) {
-  //       data[i].classList.remove("d-none");
-  //     } else {
-  //       data[i].classList.add("d-none");
-  //     }
-  //   }
-  // };
-
-  //Edit start
-  //const [editModal, setEditModal] = useState(false);
-  // Edit function editable page loop
-  const [editContentId, setEditContentId] = useState(null);
-
-  // Edit function button click to edit
   const handleEditClick = (event, content) => {
-    event.preventDefault();
-    setEditContentId(content.companyId);
-    const formValues = {
+    setIsEdit(true);
+    const formData = {
+      companyId: content.companyId,
       companyName: content.companyName,
-      companyDescription: content.companyDescription
+      companyDescription: content.companyDescription,
     };
-    setEditFormData(formValues);
-    //setEditModal(true);
-  };
-
-  // edit  data
-  const [editFormData, setEditFormData] = useState({
-    companyName: "",
-    companyDescription: "",
-  
-  });
-
-  //update data function
-  const handleEditFormChange = (event) => {
-    event.preventDefault();
-    const {
-      target: { name, value },
-    } = event;
-    console.log("Called edit form change", name, value)
-    const newFormData = { ...editFormData, [name]: value };
-    setEditFormData(newFormData);
-  };
-
-/*  const handleEditFormSwitch = (checked, e, id) => {
-    const newFormData = { ...editFormData };
-    newFormData[id] = checked;
-    setEditFormData(newFormData);
-  };*/
-  // edit form data submit
-  const handleEditFormSubmit = (event) => {
-    event.preventDefault();
-    const editedContent = {
-      id: editContentId,
-      companyName: editFormData.companyName,
-      companyDescription: editFormData.companyDescription,
-    };
-    const newCompaniesList = [...CompaniesList];
-    const index = CompaniesList.findIndex(
-      (content) => content.companyId === editContentId
-    );
-    newCompaniesList[index] = editedContent;
-    setCompaniesList(newCompaniesList);
-
-    let data = {
-      "companyId": editContentId,
-      "companyName": editFormData.companyName,
-      "companyDescription": editFormData.companyDescription,
-      "createdDate": new Date().toISOString(),
-      "createdBy": userId,
-      "modifiedDate": new Date().toISOString(),
-      "modifiedBy": userId
-    };
-
-    axios({
-      method: 'post',
-      url: config.base_url + '/api/Company/AddCompany',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      data: JSON.stringify(data)
-    })
-      .then(function (response) {
-        setEditContentId(null);
-        const index = CompaniesList.findIndex(company => company.companyId === editContentId);
-
-        if (index >= 0) {
-          const newCompanies = Array.from(CompaniesList);
-          newCompanies[index] = data;
-          setCompaniesList(newCompanies);
-          setEditFormData({
-            companyName: "",
-            companyDescription: "",
-            isActive: true,
-            isDeleted: false,
-          })
-          getCompaniessList();
-          swal("Good job!", "Successfully Updated", "success");
-        }
-      })
-      .catch(function (error) {
-        console.log(error);
-      });
-
-    // setEditModal(false);
-  };
-  //Cencel button to same data
-  const handleCancelClick = () => {
-    setEditContentId(null);
+    setFormData(formData);
+    setAddCard(true);
   };
 
   return (
     <>
-      <PageTitle activeMenu="Table" motherMenu="Post" />
       <div className="col-12">
         <Modal className="modal fade" show={addCard} onHide={setAddCard}>
           <div className="" role="document">
             <div className="">
-              <form onSubmit={handleAddFormSubmit}>
+              <form onSubmit={handleFormSubmit}>
                 <div className="modal-header">
-                  <h4 className="modal-title fs-20">Add Company</h4>
+                  <h4 className="modal-title fs-20">
+                    {isEdit ? "Update" : "Add"} Company
+                  </h4>
                   <button
                     type="button"
                     className="btn-close btn btn-danger"
-                    onClick={() => setAddCard(false)}
+                    onClick={() => {
+                      setAddCard(false);
+                    }}
                     data-dismiss="modal"
                   >
                     close
@@ -265,15 +139,18 @@ const Companies = () => {
                   <div className="add-contact-box">
                     <div className="add-contact-content">
                       <div className="form-group mb-3">
-                        <label className="text-black font-w500">company Name</label>
+                        <label className="text-black font-w500">
+                          Company Name
+                        </label>
                         <div className="contact-name">
                           <input
                             type="text"
                             className="form-control"
-                            autocomplete="off"
+                            autoComplete="off"
                             name="companyName"
+                            value={formData.companyName}
                             required="required"
-                            onChange={handleAddFormChange}
+                            onChange={handleInputChange}
                             placeholder="companyName"
                           />
                           <span className="validation-text"></span>
@@ -287,10 +164,11 @@ const Companies = () => {
                           <input
                             type="text"
                             className="form-control"
-                            autocomplete="off"
+                            autoComplete="off"
                             name="companyDescription"
+                            value={formData.companyDescription}
                             required="required"
-                            onChange={handleAddFormChange}
+                            onChange={handleInputChange}
                             placeholder="Description"
                           />
                           <span className="validation-text"></span>
@@ -313,7 +191,7 @@ const Companies = () => {
                 </div>
                 <div className="modal-footer">
                   <button type="submit" className="btn btn-primary">
-                    Add
+                    {isEdit ? "Update" : "Add"}
                   </button>
                   <button
                     type="button"
@@ -332,77 +210,69 @@ const Companies = () => {
           <div className="card-header">
             <h4 className="card-title">Companies</h4>
             <div>
-              <Link
+              <button
                 className="btn btn-primary shadow btn-xs sharp mr-2 add-user-btn"
-                onClick={() => setAddCard(true)}
+                onClick={() => {
+                  setIsEdit(false);
+                  setAddCard(true);
+                }}
               >
                 <i className="fa fa-plus">Add Companiess</i>
-              </Link>
+              </button>
             </div>
           </div>
           <div className="card-body">
             <div className="w-100 table-responsive">
               <div id="example_wrapper" className="dataTables_wrapper">
-                <form onSubmit={handleEditFormSubmit}>
-                  <table id="example" className="display w-100 dataTable">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Description</th>
-                        {/* <th>IsActive</th>
+                <table id="example" className="display w-100 dataTable">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Description</th>
+                      {/* <th>IsActive</th>
                         <th>IsDeleted</th> */}
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {console.log(CompaniesList, "test conte")}
-
-                      {CompaniesList.map((content) => (
-                        <>
-                          {editContentId === content.companyId ? (
-                            <Editable
-                              editFormData={editFormData}
-                              handleEditFormChange={handleEditFormChange}
-                              //handleEditFormSwitch={handleEditFormSwitch}
-                              handleCancelClick={handleCancelClick}
-                            />
-                          ) : (
-                            <tr>
-                              <td>{content.companyName}</td>
-                              <td>{content.companyDescription}</td>
-                              {/* <td>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(CompaniesList)
+                      ? CompaniesList.map((content) => (
+                          <tr key={content.companyId}>
+                            <td>{content.companyName}</td>
+                            <td>{content.companyDescription}</td>
+                            {/* <td>
                                 <strong>{content.isActive.toString()}</strong>
                               </td>
                               <td>
                                 <strong>{content.isDeleted.toString()}</strong>
                               </td> */}
-                              <td>
-                                <div className="d-flex">
-                                  <Link
-                                    className="btn btn-secondary shadow btn-xs sharp mr-2"
-                                    onClick={(event) =>
-                                      handleEditClick(event, content)
-                                    }
-                                  >
-                                    <i className="fa fa-pencil"></i>
-                                  </Link>
-                                  <Link
-                                    className="btn btn-danger shadow btn-xs sharp"
-                                    onClick={() =>
-                                      handleDeleteClick(content.companyId)
-                                    }
-                                  >
-                                    <i className="fa fa-trash"></i>
-                                  </Link>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </>
-                      ))}
-                    </tbody>
-                  </table>
-                </form>
+                            <td>
+                              <div className="d-flex">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary shadow btn-xs sharp mr-2"
+                                  onClick={(event) =>
+                                    handleEditClick(event, content)
+                                  }
+                                >
+                                  <i className="fa fa-pencil"></i>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger shadow btn-xs sharp"
+                                  onClick={() =>
+                                    handleDeleteClick(content.companyId)
+                                  }
+                                >
+                                  <i className="fa fa-trash"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      : null}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

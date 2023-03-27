@@ -1,15 +1,29 @@
-import { applyMiddleware, combineReducers, compose, createStore } from "redux";
+import { applyMiddleware, combineReducers, createStore } from "redux";
 import thunk from "redux-thunk";
+import { createLogger } from 'redux-logger';
+import { composeWithDevTools } from 'redux-devtools-extension';
 import { AuthReducer } from "./reducers/AuthReducer";
+import { CompaniesReducer } from "./reducers/CompaniesReducer";
+import { UsersReducer } from "./reducers/UsersReducer";
 
-const middleware = applyMiddleware(thunk);
+// Create middlewares based on development/production conditions
+let middlewares = [thunk];
 
-const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+if (process.env.NODE_ENV === `development`) {
+  const logger = createLogger({
+    duration: true,
+    diff: false,
+    collapsed: true
+  });
+  middlewares.push(logger);
+}
 
 const reducers = combineReducers({
   auth: AuthReducer,
+  companies: CompaniesReducer,
+  users: UsersReducer
 });
 
 //const store = createStore(rootReducers);
 
-export const store = createStore(reducers, composeEnhancers(middleware));
+export const store = createStore(reducers, composeWithDevTools(applyMiddleware(...middlewares)));

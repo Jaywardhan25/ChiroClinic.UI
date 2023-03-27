@@ -1,17 +1,18 @@
 import axios from 'axios';
-import { store } from '../store/store';
+import config from '../config';
+// import { store } from '../store/store';
 
-const axiosInstance = axios.create({
-    baseURL: `https://react-course-b798e-default-rtdb.firebaseio.com/`,
+const ax = axios.create({
+    baseURL: config.base_url,
 });
 
-axiosInstance.interceptors.request.use((config) => {
-    const state = store.getState();
-    const token = state.auth.auth.idToken;
-    config.params = config.params || {};
-    config.params['auth'] = token;
-	console.log(config);
-    return config;
-});
+// ax.interceptors.request.use((config) => {
+//     const state = store.getState();
+//     const token = state.auth.auth.idToken;
+//     config.params = config.params || {};
+//     config.params['auth'] = token;
+// 	console.log(config);
+//     return config;
+// });
 
-export default axiosInstance;
+export default ax;
